@@ -1,0 +1,112 @@
+// Prisma Schema for Society Maintenance Tracker
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  RESIDENT
+  ADMIN
+}
+
+enum ComplaintCategory {
+  PLUMBING
+  ELECTRICAL
+  ELEVATOR
+  SECURITY
+  CLEANLINESS
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id            String                  @id @default(cuid())
+  name          String
+  email         String                  @unique
+  password      String
+  role          Role                    @default(RESIDENT)
+  unitNumber    String?
+  phone         String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  complaints    Complaint[]
+  statusChanges ComplaintStatusHistory[]
+  notices       Notice[]
+  settings      Settings[]
+}
+
+model Complaint {
+  id          String                  @id @default(cuid())
+  title       String
+  description String
+  category    ComplaintCategory       @default(OTHER)
+  priority    Priority                @default(MEDIUM)
+  status      ComplaintStatus         @default(OPEN)
+  photoUrl    String?
+  
+  residentId  String
+  resident    User                    @relation(fields: [residentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  statusHistory ComplaintStatusHistory[]
+}
+
+model ComplaintStatusHistory {
+  id             String           @id @default(cuid())
+  complaintId    String
+  complaint      Complaint        @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  
+  changedById    String
+  changedBy      User             @relation(fields: [changedById], references: [id], onDelete: Cascade)
+  
+  previousStatus ComplaintStatus?
+  newStatus      ComplaintStatus
+  notes          String?
+  
+  createdAt      DateTime         @default(now())
+}
+
+model Notice {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  isImportant Boolean  @default(false)
+  isPinned    Boolean  @default(false)
+  
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Settings {
+  id                   String   @id @default(cuid())
+  overdueThresholdDays Int      @default(3)
+  
+  updatedById          String?
+  updatedBy            User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
