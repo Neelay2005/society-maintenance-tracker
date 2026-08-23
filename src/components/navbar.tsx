@@ -22,6 +22,32 @@ export function Navbar() {
 
         {session?.user && (
           <div className="flex items-center space-x-4">
+            <nav className="hidden md:flex items-center space-x-2 mr-2">
+              {session.user.role === "ADMIN" ? (
+                <>
+                  <Link
+                    href="/admin/dashboard"
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/admin/settings"
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1"
+                  >
+                    <span>Settings</span>
+                  </Link>
+                </>
+              ) : (
+                <Link
+                  href="/resident/dashboard"
+                  className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  My Complaints
+                </Link>
+              )}
+            </nav>
+
             <div className="flex items-center space-x-3 bg-slate-800/80 px-3.5 py-1.5 rounded-full border border-slate-700/60">
               <div className="flex items-center space-x-2">
                 {session.user.role === "ADMIN" ? (

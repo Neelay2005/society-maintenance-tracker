@@ -179,3 +179,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## 📊 Status
 - ✅ **Phase 0 — Setup & Planning**: Architecture locked, PostgreSQL/Prisma ER diagram finalized, Docker Compose, Env structure & README completed.
 - ✅ **Phase 1 — Foundation (Auth + Database)**: Next.js + Auth.js v5 + Bcrypt + Zod + Prisma models + Admin seed + Role Authorization implemented.
+- ✅ **Phase 2 — Complaints Core: Resident Side**: Complaint creation with Zod server validation, photo attachment handling, single Prisma transaction for Complaint + initial ComplaintStatusHistory, privacy enforcement, and resident status timeline UI.
+- ✅ **Phase 3 — Admin Complaint Workflow**: Admin dashboard with bookmarkable URL query parameter filters (`status`, `category`, `priority`), priority management, strict status transition validation, read-only protection for resolved complaints, and atomic Prisma transaction status history updates.
+- ✅ **Phase 4 — Overdue Detection + Settings**: Configurable overdue threshold in DB `Settings`, real-time query calculation for overdue complaints without cron jobs, overdue badge display with age tracking, and sorting overdue complaints at the top of admin desk.
+

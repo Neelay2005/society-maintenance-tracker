@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Role, ComplaintStatus } from "@prisma/client";
+import { Role, ComplaintStatus, Priority } from "@prisma/client";
 
 export async function PATCH(
   req: Request,
@@ -14,21 +14,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Explicit Authorization Check: Only ADMIN role can change complaint status
+    // Explicit Authorization Check: Only ADMIN role can change complaint status/priority
     if (session.user.role !== Role.ADMIN) {
       return NextResponse.json(
-        { error: "Forbidden: Only Admins can change complaint status" },
+        { error: "Forbidden: Only Admins can change complaint status or priority" },
         { status: 403 }
       );
     }
 
     const { id } = await params;
     const body = await req.json();
-    const { status: newStatus, notes } = body;
-
-    if (!newStatus || !Object.values(ComplaintStatus).includes(newStatus)) {
-      return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
-    }
+    const { status: newStatus, priority: newPriority, notes } = body;
 
     const existingComplaint = await prisma.complaint.findUnique({
       where: { id },
@@ -38,23 +34,73 @@ export async function PATCH(
       return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
     }
 
-    const previousStatus = existingComplaint.status;
+    // Rule 1: Resolved / Closed complaints are READ-ONLY!
+    if (
+      existingComplaint.status === ComplaintStatus.RESOLVED ||
+      existingComplaint.status === ComplaintStatus.CLOSED
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden: Resolved or closed complaints are read-only and cannot be modified." },
+        { status: 400 }
+      );
+    }
 
-    // Update complaint status
-    const updatedComplaint = await prisma.complaint.update({
-      where: { id },
-      data: { status: newStatus },
-    });
+    // Rule 2: Validate Status Transition
+    if (newStatus) {
+      if (!Object.values(ComplaintStatus).includes(newStatus)) {
+        return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+      }
 
-    // Record entry in ComplaintStatusHistory (separate table)
-    const historyEntry = await prisma.complaintStatusHistory.create({
-      data: {
-        complaintId: id,
-        changedById: session.user.id,
-        previousStatus,
-        newStatus,
-        notes: notes || null,
-      },
+      // Valid transition mapping
+      const validTransitions: Record<ComplaintStatus, ComplaintStatus[]> = {
+        [ComplaintStatus.OPEN]: [ComplaintStatus.OPEN, ComplaintStatus.IN_PROGRESS, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
+        [ComplaintStatus.IN_PROGRESS]: [ComplaintStatus.IN_PROGRESS, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
+        [ComplaintStatus.RESOLVED]: [], // Read-only
+        [ComplaintStatus.CLOSED]: [], // Read-only
+      };
+
+      const allowedNext = validTransitions[existingComplaint.status] || [];
+      if (!allowedNext.includes(newStatus)) {
+        return NextResponse.json(
+          {
+            error: `Invalid status transition from ${existingComplaint.status} to ${newStatus}. Once resolved/closed, complaints cannot be reopened.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Rule 3: Validate Priority if provided
+    if (newPriority && !Object.values(Priority).includes(newPriority)) {
+      return NextResponse.json({ error: "Invalid priority value" }, { status: 400 });
+    }
+
+    const targetStatus = newStatus || existingComplaint.status;
+    const targetPriority = newPriority || existingComplaint.priority;
+
+    // Execute Complaint update + ComplaintStatusHistory insertion inside ONE Prisma transaction
+    const [updatedComplaint, historyEntry] = await prisma.$transaction(async (tx) => {
+      const updated = await tx.complaint.update({
+        where: { id },
+        data: {
+          status: targetStatus,
+          priority: targetPriority,
+        },
+      });
+
+      const noteText = notes || (newPriority && newPriority !== existingComplaint.priority ? `Priority changed to ${newPriority}` : null);
+
+      const history = await tx.complaintStatusHistory.create({
+        data: {
+          complaintId: id,
+          changedById: session.user.id,
+          previousStatus: existingComplaint.status,
+          newStatus: targetStatus,
+          notes: noteText,
+        },
+      });
+
+      return [updated, history];
     });
 
     return NextResponse.json({
@@ -62,7 +108,8 @@ export async function PATCH(
       history: historyEntry,
     });
   } catch (error) {
-    console.error("Error updating complaint status:", error);
+    console.error("Error updating complaint status/priority:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

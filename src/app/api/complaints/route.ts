@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { complaintCreateSchema } from "@/lib/validations/complaint";
 import { Role } from "@prisma/client";
 
 export async function GET(req: Request) {
@@ -12,31 +13,49 @@ export async function GET(req: Request) {
     }
 
     const { role, id: userId } = session.user;
+    const { searchParams } = new URL(req.url);
 
-    // Authorization rule:
-    // ADMIN can view all complaints.
-    // RESIDENT can ONLY view their own complaints.
-    if (role === Role.ADMIN) {
-      const complaints = await prisma.complaint.findMany({
-        include: {
-          resident: {
-            select: { id: true, name: true, email: true, unitNumber: true },
-          },
-          statusHistory: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      return NextResponse.json({ complaints });
-    } else {
-      const complaints = await prisma.complaint.findMany({
-        where: { residentId: userId },
-        include: {
-          statusHistory: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      return NextResponse.json({ complaints });
+    const statusParam = searchParams.get("status")?.toUpperCase();
+    const categoryParam = searchParams.get("category")?.toUpperCase();
+    const priorityParam = searchParams.get("priority")?.toUpperCase();
+
+    const whereClause: any = {};
+
+    if (role !== Role.ADMIN) {
+      whereClause.residentId = userId;
     }
+
+    if (statusParam && statusParam !== "ALL") {
+      whereClause.status = statusParam;
+    }
+
+    if (categoryParam && categoryParam !== "ALL") {
+      whereClause.category = categoryParam;
+    }
+
+    if (priorityParam && priorityParam !== "ALL") {
+      whereClause.priority = priorityParam;
+    }
+
+    const complaints = await prisma.complaint.findMany({
+      where: whereClause,
+      include: {
+        resident: {
+          select: { id: true, name: true, email: true, unitNumber: true },
+        },
+        statusHistory: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            changedBy: {
+              select: { name: true, role: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ complaints });
   } catch (error) {
     console.error("Error fetching complaints:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -52,39 +71,59 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { title, description, category, photoUrl } = body;
 
-    if (!title || !description) {
+    // Server-side Zod validation
+    const validationResult = complaintCreateSchema.safeParse(body);
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Title and description are required" },
+        {
+          error: "Validation failed",
+          details: validationResult.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    const complaint = await prisma.complaint.create({
-      data: {
-        title,
-        description,
-        category: category || "OTHER",
-        photoUrl: photoUrl || null,
-        residentId: session.user.id,
-      },
+    const { title, description, category, priority, photoUrl } = validationResult.data;
+
+    // Execute Complaint Creation + ComplaintStatusHistory in ONE Database Transaction
+    const [complaint, history] = await prisma.$transaction(async (tx) => {
+      const newComplaint = await tx.complaint.create({
+        data: {
+          title,
+          description,
+          category,
+          priority: priority || "MEDIUM",
+          photoUrl: photoUrl || null,
+          residentId: session.user.id,
+          status: "OPEN",
+        },
+      });
+
+      const initialHistory = await tx.complaintStatusHistory.create({
+        data: {
+          complaintId: newComplaint.id,
+          changedById: session.user.id,
+          previousStatus: null,
+          newStatus: "OPEN",
+          notes: "Complaint raised",
+        },
+      });
+
+      return [newComplaint, initialHistory];
     });
 
-    // Create initial status history entry
-    await prisma.complaintStatusHistory.create({
-      data: {
-        complaintId: complaint.id,
-        changedById: session.user.id,
-        previousStatus: null,
-        newStatus: "OPEN",
-        notes: "Complaint created",
+    return NextResponse.json(
+      {
+        complaint: {
+          ...complaint,
+          statusHistory: [history],
+        },
       },
-    });
-
-    return NextResponse.json({ complaint }, { status: 201 });
+      { status: 201 }
+    );
   } catch (error) {
-    console.error("Error creating complaint:", error);
+    console.error("Error creating complaint in transaction:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

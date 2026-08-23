@@ -17,9 +17,10 @@ enum Role {
 enum ComplaintCategory {
   PLUMBING
   ELECTRICAL
-  ELEVATOR
+  CLEANING
   SECURITY
-  CLEANLINESS
+  NOISE
+  MAINTENANCE
   OTHER
 }
 
