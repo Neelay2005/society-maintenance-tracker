@@ -32,19 +32,33 @@ export function Navbar() {
                     Dashboard
                   </Link>
                   <Link
-                    href="/admin/settings"
-                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1"
+                    href="/notices"
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
                   >
-                    <span>Settings</span>
+                    Notice Board
+                  </Link>
+                  <Link
+                    href="/admin/settings"
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    Settings
                   </Link>
                 </>
               ) : (
-                <Link
-                  href="/resident/dashboard"
-                  className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                >
-                  My Complaints
-                </Link>
+                <>
+                  <Link
+                    href="/resident/dashboard"
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    My Complaints
+                  </Link>
+                  <Link
+                    href="/notices"
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    Notice Board
+                  </Link>
+                </>
               )}
             </nav>
 

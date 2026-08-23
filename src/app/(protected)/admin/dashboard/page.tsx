@@ -19,6 +19,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+import { AdminCharts } from "@/components/admin-charts";
+
 interface StatusHistory {
   id: string;
   previousStatus: string | null;
@@ -61,6 +63,12 @@ function AdminDashboardContent() {
   const [overdueThresholdDays, setOverdueThresholdDays] = useState(3);
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Analytics State
+  const [analyticsData, setAnalyticsData] = useState<{
+    categoryData: { category: string; count: number }[];
+    statusData: { status: string; rawStatus: string; count: number }[];
+  } | null>(null);
+
   // Status/Priority update modal state
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [newStatus, setNewStatus] = useState<string>("IN_PROGRESS");
@@ -95,9 +103,10 @@ function AdminDashboardContent() {
       const queryStr = searchParams.toString();
       const apiUrl = queryStr ? `/api/complaints?${queryStr}` : "/api/complaints";
 
-      const [compRes, setRes] = await Promise.all([
+      const [compRes, setRes, analyticsRes] = await Promise.all([
         fetch(apiUrl),
         fetch("/api/settings"),
+        fetch("/api/admin/analytics"),
       ]);
 
       if (compRes.ok) {
@@ -109,6 +118,13 @@ function AdminDashboardContent() {
         if (s.settings?.overdueThresholdDays) {
           setOverdueThresholdDays(s.settings.overdueThresholdDays);
         }
+      }
+      if (analyticsRes.ok) {
+        const a = await analyticsRes.json();
+        setAnalyticsData({
+          categoryData: a.categoryData || [],
+          statusData: a.statusData || [],
+        });
       }
     } catch (err) {
       console.error("Failed to fetch admin data:", err);
@@ -292,6 +308,14 @@ function AdminDashboardContent() {
           </div>
         </div>
       </div>
+
+      {/* Recharts Analytics Section */}
+      {analyticsData && (
+        <AdminCharts
+          categoryData={analyticsData.categoryData}
+          statusData={analyticsData.statusData}
+        />
+      )}
 
       {/* URL Query Parameters Filter Bar */}
       <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl space-y-3">

@@ -182,4 +182,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - ✅ **Phase 2 — Complaints Core: Resident Side**: Complaint creation with Zod server validation, photo attachment handling, single Prisma transaction for Complaint + initial ComplaintStatusHistory, privacy enforcement, and resident status timeline UI.
 - ✅ **Phase 3 — Admin Complaint Workflow**: Admin dashboard with bookmarkable URL query parameter filters (`status`, `category`, `priority`), priority management, strict status transition validation, read-only protection for resolved complaints, and atomic Prisma transaction status history updates.
 - ✅ **Phase 4 — Overdue Detection + Settings**: Configurable overdue threshold in DB `Settings`, real-time query calculation for overdue complaints without cron jobs, overdue badge display with age tracking, and sorting overdue complaints at the top of admin desk.
+- ✅ **Phase 5 — Notice Board**: Society notice board with priority ordering (`isImportant DESC`, `createdAt DESC`), admin CRUD controls, and resident read-only view.
+- ✅ **Phase 6 — Email Notifications**: Resend integration for complaint status change notifications and important notice broadcasts, built with non-blocking error handling to ensure email failures never undo successful database operations.
+- ✅ **Phase 7 — Admin Dashboard & Analytics**: Interactive analytics dashboard powered by Recharts (Complaints by Category BarChart & Complaints by Status PieChart), backed by Prisma `groupBy` aggregation API endpoints.
+- ✅ **Phase 8 — Testing, Documentation & Deployment**: Fully documented `.env.example`, verified production build, clean TypeScript compilation, and GitHub version control integration.
+
 

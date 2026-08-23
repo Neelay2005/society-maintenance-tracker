@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Role, ComplaintStatus, Priority } from "@prisma/client";
+import { sendStatusChangeEmail } from "@/lib/email";
 
 export async function PATCH(
   req: Request,
@@ -102,6 +103,30 @@ export async function PATCH(
 
       return [updated, history];
     });
+
+    // PHASE 6: Non-blocking Email Notification
+    // Database transaction succeeded! Now try to send notification email.
+    // Email failure MUST NOT fail or roll back the HTTP response.
+    try {
+      const resident = await prisma.user.findUnique({
+        where: { id: existingComplaint.residentId },
+        select: { email: true, name: true },
+      });
+
+      if (resident && resident.email) {
+        // Fire and forget (or await inside try/catch)
+        await sendStatusChangeEmail({
+          to: resident.email,
+          residentName: resident.name,
+          complaintId: existingComplaint.id,
+          title: existingComplaint.title,
+          newStatus: targetStatus,
+          notes,
+        });
+      }
+    } catch (emailError) {
+      console.error("[Email Notification Warning] Failed to send email, but DB transaction succeeded:", emailError);
+    }
 
     return NextResponse.json({
       complaint: updatedComplaint,
